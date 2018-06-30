@@ -26,12 +26,6 @@ import url from 'url';
 import querystring from 'querystring';
 import ProgressBar from 'react-progress-bar-plus';
 
-// let urlArgs = url.parse(window.location.href);
-// let args = querystring.parse(urlArgs.query);
-// if ('csv' in args) {
-//   this._parseCsv(args.csv);
-// }
-
 class App extends Component {
 
   state = {
@@ -50,13 +44,80 @@ class App extends Component {
   };
 
   _onUploadChange = (event) => {
-    this._parseCsv(event.target.files[0]);
+    if (event.target.files[0].name.endsWith('.csv')) {
+      this._parseCsv(event.target.files[0]);
+    } else {
+      this._parseJSON(event.target.files[0]);
+    }
   };
 
   _updateProgressBar = (percent) => {
     this.setState({
       loadPercent: percent,
     });
+  };
+
+  componentDidMount() {
+    console.log('time to rise and shine');
+  };
+
+  _parseJSON = (fileOrUrl) => {
+
+    var reader = new FileReader();
+
+    reader.onload = function(e) {
+      var headings = [];
+      var columns = {};
+
+      var json = JSON.parse(e.target.result);
+
+      var satdat_keys = Object.keys(json.satdat[0]);
+      var result_keys = Object.keys(json.satdat[0].result);
+
+      satdat_keys.splice(satdat_keys.indexOf('result'), 1);
+
+      for (const h of satdat_keys) {
+        headings.push(h);
+        columns[h] = [];
+      }
+
+      for (const h of result_keys) {
+        var key = 'result.' + h;
+        headings.push(key);
+        columns[key] = [];
+      }
+
+      for (const f of json.satdat) {
+        for (const h of satdat_keys) {
+          columns[h].push(f[h]);
+        }
+        var result = f.result || {};
+        for (const h of result_keys) {
+          var key = 'result.' + h;
+          columns[key].push(result[h]);
+        }
+      }
+
+      for (const prop of ['created', 'datetime']) {
+        if (columns[prop]) {
+          columns[prop] = columns[prop].map(function(t) { return new Date(t).getTime() / 1000.0; });
+        }
+      }
+
+      var columns_list = [];
+      var enums = [];
+
+      for (const h of headings) {
+        var newCol = intern(columns[h]);
+        columns_list.push(newCol.newColumn);
+        enums.push(newCol.enums);
+      }
+
+      this._onReaderLoad(headings, columns_list, enums);
+
+    }.bind(this);
+
+    reader.readAsText(fileOrUrl);
   };
 
   _parseCsv = (fileOrUrl) => {
@@ -214,7 +275,7 @@ class App extends Component {
           <ProgressBar spinner={false} percent={this.state.loadPercent}/>
           <div className="vp-header-item vp-upload">
             <span>Upload a new dataset</span>
-            <input accept=".csv" onChange={this._onUploadChange} type="file"/>
+            <input accept=".json" onChange={this._onUploadChange} type="file"/>
           </div>
           {this.state.graphCount > 0 && <div className="vp-header-item"
               onClick={this._onAddGraphClick}>
