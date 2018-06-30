@@ -59,17 +59,16 @@ class App extends Component {
 
   componentDidMount() {
     console.log('time to rise and shine');
+    this._parseJSON('data.json');
   };
 
   _parseJSON = (fileOrUrl) => {
 
-    var reader = new FileReader();
+    var inst = this;
 
-    reader.onload = function(e) {
+    function json_translation(json) {
       var headings = [];
       var columns = {};
-
-      var json = JSON.parse(e.target.result);
 
       var satdat_keys = Object.keys(json.satdat[0]);
       var result_keys = Object.keys(json.satdat[0].result);
@@ -113,11 +112,22 @@ class App extends Component {
         enums.push(newCol.enums);
       }
 
-      this._onReaderLoad(headings, columns_list, enums);
+      inst._onReaderLoad(headings, columns_list, enums);
+    }
 
-    }.bind(this);
+    if (typeof fileOrUrl == 'string') {
+      fetch(fileOrUrl, {credentials: 'same-origin'})
+        .then((response) => response.json())
+        .then((json) => json_translation(json));
+    } else {
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        var json = JSON.parse(e.target.result);
+        json_translation(json);
+      }
+      reader.readAsText(fileOrUrl);
+    }
 
-    reader.readAsText(fileOrUrl);
   };
 
   _parseCsv = (fileOrUrl) => {
@@ -273,10 +283,6 @@ class App extends Component {
     return (<div className="vp-app">
         <div className="vp-header">
           <ProgressBar spinner={false} percent={this.state.loadPercent}/>
-          <div className="vp-header-item vp-upload">
-            <span>Upload a new dataset</span>
-            <input accept=".json" onChange={this._onUploadChange} type="file"/>
-          </div>
           {this.state.graphCount > 0 && <div className="vp-header-item"
               onClick={this._onAddGraphClick}>
             Add graph
